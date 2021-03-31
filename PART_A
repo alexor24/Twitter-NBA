@@ -1,0 +1,623 @@
+---In psql (shell):
+
+--- 1. Create a Database UNLESS ALREADY CREATED
+CREATE DATABASE tweets
+
+--- connect to database: 
+
+\c tweets
+
+--- 2. Create a Table
+
+CREATE TABLE raw_json (tweets json);
+
+--- 3. Set encoding standard
+
+\encoding UTF8
+
+--- 4. Load the Data
+
+\copy raw_json (tweets) FROM 'C:path'
+
+---
+
+--- In pgAdmin4
+
+ALTER TABLE raw_json
+
+ALTER COLUMN tweets SET DATA TYPE jsonb
+
+USING tweets::jsonb;
+
+
+
+
+
+--- Create relational database (14 tables) ---
+
+
+
+
+-- 1. TWEETS
+
+-- CREATE TABLE TWEETS
+CREATE TABLE TWEETS AS
+SELECT jsonb_path_query(tweets, '$.id') AS tweet_id,
+		jsonb_path_query(tweets, '$.user.id') AS user_id,
+		jsonb_path_query(tweets, '$.entities.media.id') AS media_id,
+		jsonb_path_query(tweets, '$.text') AS tweet_text,
+		jsonb_path_query(tweets, '$.created_at') AS tweet_created_at,
+		jsonb_path_query(tweets, '$.place.id') AS tweet_place_id,
+		jsonb_path_query(tweets, '$.lang') AS tweet_language,
+		jsonb_path_query(tweets, '$.in_reply_to_user_id') AS in_reply_to_user_id,
+		jsonb_path_query(tweets, '$.in_reply_to_status_id') AS in_reply_to_status_id,
+		jsonb_path_query(tweets, '$.in_reply_to_screen_name') AS in_reply_to_screen_name,
+		jsonb_path_query(tweets, '$.possibly_sensitive') AS possibly_sensitive,
+		jsonb_path_query(tweets, '$.source') AS tweet_source
+FROM raw_json LIMIT 60000;
+
+-- Specify Data types
+ALTER TABLE TWEETS
+ALTER COLUMN 
+  tweet_id SET DATA TYPE bigint USING tweet_id::bigint,
+  ALTER COLUMN 
+  user_id SET DATA TYPE bigint USING user_id::bigint,
+  ALTER COLUMN 
+  media_id SET DATA TYPE bigint USING media_id::bigint,
+  ALTER COLUMN 
+  tweet_text SET DATA TYPE text USING tweet_text::text,
+  ALTER COLUMN 
+  tweet_place_id SET DATA TYPE varchar USING tweet_place_id::varchar,
+  ALTER COLUMN 
+  tweet_created_at SET DATA TYPE varchar USING tweet_created_at::varchar,
+  ALTER COLUMN 
+  tweet_language SET DATA TYPE varchar USING tweet_language::varchar,
+  ALTER COLUMN 
+  in_reply_to_user_id SET DATA TYPE varchar USING in_reply_to_user_id::varchar,
+  ALTER COLUMN 
+  in_reply_to_status_id SET DATA TYPE varchar USING in_reply_to_status_id::varchar,
+  ALTER COLUMN 
+  in_reply_to_screen_name SET DATA TYPE varchar USING in_reply_to_screen_name::varchar,
+  ALTER COLUMN 
+  possibly_sensitive SET DATA TYPE boolean USING possibly_sensitive::boolean,
+  ALTER COLUMN 
+  tweet_source SET DATA TYPE varchar USING tweet_source::varchar;    
+
+ALTER TABLE TWEETS
+  ALTER COLUMN 
+  tweet_created_at SET DATA TYPE timestamptz USING tweet_created_at::timestamptz;
+  
+-- Delete duplicates
+DELETE FROM TWEETS
+WHERE tweet_id IN
+    (SELECT tweet_id
+    FROM 
+        (SELECT tweet_id,
+         ROW_NUMBER() OVER( PARTITION BY tweet_id
+        ORDER BY  tweet_id ) AS row_num
+        FROM TWEETS) t
+        WHERE t.row_num > 1 );
+
+-- Drop null tweets
+DELETE FROM TWEETS WHERE tweet_id IS NULL;		
+
+-- Add primary key
+ALTER TABLE TWEETS ADD PRIMARY KEY (tweet_id);
+
+
+--- 2. INTERACTIONS
+-- CREATE TABLE INTERACTIONS
+CREATE TABLE INTERACTIONS AS
+SELECT jsonb_path_query(tweets, '$.id') AS tweet_id,
+        jsonb_path_query(tweets, '$.retweeted_status.retweeted') AS retweeted,
+		jsonb_path_query(tweets, '$.retweeted_status.favorited') AS favorited,
+		jsonb_path_query(tweets, '$.retweeted_status.reply_count') AS reply_count,
+		jsonb_path_query(tweets, '$.retweeted_status.quote_count') AS quote_count,
+		jsonb_path_query(tweets, '$.retweeted_status.retweet_count') AS retweet_count
+FROM raw_json LIMIT 60000;
+
+-- Specify Data types
+ALTER TABLE INTERACTIONS
+ALTER COLUMN 
+  tweet_id SET DATA TYPE bigint USING tweet_id::bigint,
+  ALTER COLUMN 
+  retweeted SET DATA TYPE boolean USING retweeted::boolean,
+  ALTER COLUMN 
+  favorited SET DATA TYPE boolean USING favorited::boolean,
+  ALTER COLUMN 
+  reply_count SET DATA TYPE bigint USING reply_count::bigint,
+  ALTER COLUMN 
+  quote_count SET DATA TYPE bigint USING quote_count::bigint,
+  ALTER COLUMN 
+  retweet_count SET DATA TYPE bigint USING retweet_count::bigint; 
+  
+-- Delete duplicates
+DELETE FROM INTERACTIONS
+WHERE tweet_id IN
+    (SELECT tweet_id
+    FROM 
+        (SELECT tweet_id,
+         ROW_NUMBER() OVER( PARTITION BY tweet_id
+        ORDER BY  tweet_id ) AS row_num
+        FROM INTERACTIONS) t
+        WHERE t.row_num > 1 );
+
+-- Drop null tweets
+DELETE FROM INTERACTIONS WHERE tweet_id IS NULL;	
+
+-- Add FOREIGN key
+ALTER TABLE INTERACTIONS ADD FOREIGN KEY (tweet_id) REFERENCES TWEETS;
+ALTER TABLE INTERACTIONS ADD PRIMARY KEY (tweet_id);
+
+-- 3. RETWEET_INFO
+
+-- CREATE TABLE RETWEET_INFO
+CREATE TABLE RETWEET_INFO AS
+SELECT jsonb_path_query(tweets, '$.id') AS tweet_id,
+		jsonb_path_query(tweets, '$.quoted_status_id') AS quoted_status_id,
+		jsonb_path_query(tweets, '$.truncated') AS truncated,
+		jsonb_path_query(tweets, '$.is_quote_status') AS is_quote_status,
+		jsonb_path_query(tweets, '$.in_reply_to_status_id') AS in_reply_to_status_id
+FROM raw_json LIMIT 60000;
+
+-- Specify Data types
+ALTER TABLE RETWEET_INFO
+ALTER COLUMN 
+  tweet_id SET DATA TYPE bigint USING tweet_id::bigint,
+  ALTER COLUMN 
+  quoted_status_id SET DATA TYPE bigint USING quoted_status_id::bigint,
+  ALTER COLUMN 
+  truncated SET DATA TYPE boolean USING truncated::boolean,
+  ALTER COLUMN 
+  is_quote_status SET DATA TYPE boolean USING is_quote_status::boolean,
+  ALTER COLUMN 
+  in_reply_to_status_id SET DATA TYPE varchar USING in_reply_to_status_id::varchar;    
+
+
+-- Delete duplicates
+DELETE FROM RETWEET_INFO
+WHERE tweet_id IN
+    (SELECT tweet_id
+    FROM 
+        (SELECT tweet_id,
+         ROW_NUMBER() OVER( PARTITION BY tweet_id
+        ORDER BY  tweet_id ) AS row_num
+        FROM RETWEET_INFO) t
+        WHERE t.row_num > 1 );
+
+-- Drop null tweets
+DELETE FROM RETWEET_INFO WHERE tweet_id IS NULL;		
+
+-- Add FOREIGN key
+ALTER TABLE RETWEET_INFO ADD FOREIGN KEY (tweet_id) REFERENCES TWEETS;
+
+-- Add Primary key
+ALTER TABLE RETWEET_INFO ADD PRIMARY KEY (tweet_id);
+
+
+-- 4. TWEET_METADATA
+
+-- CREATE TABLE TWEET_METADATA
+CREATE TABLE TWEET_METADATA AS
+SELECT jsonb_path_query(tweets, '$.id') AS tweet_id,
+		jsonb_path_query(tweets, '$.entities.urls') AS urls,
+		jsonb_path_query(tweets, '$.entities.media') AS media,
+		jsonb_path_query(tweets, '$.entities.hashtags') AS hashtags
+FROM raw_json LIMIT 60000;
+
+-- Specify Data types
+ALTER TABLE TWEET_METADATA
+ALTER COLUMN 
+  tweet_id SET DATA TYPE bigint USING tweet_id::bigint,
+  ALTER COLUMN 
+  urls SET DATA TYPE jsonb USING urls::jsonb,
+  ALTER COLUMN 
+  media SET DATA TYPE jsonb USING media::jsonb,
+  ALTER COLUMN 
+  hashtags SET DATA TYPE jsonb USING hashtags::jsonb; 
+
+-- Delete duplicates
+DELETE FROM TWEET_METADATA
+WHERE tweet_id IN
+    (SELECT tweet_id
+    FROM 
+        (SELECT tweet_id,
+         ROW_NUMBER() OVER( PARTITION BY tweet_id
+        ORDER BY  tweet_id ) AS row_num
+        FROM TWEET_METADATA) t
+        WHERE t.row_num > 1 );
+
+-- Drop null tweets
+DELETE FROM TWEET_METADATA WHERE tweet_id IS NULL;		
+
+-- Add FOREIGN key
+ALTER TABLE TWEET_METADATA ADD FOREIGN KEY (tweet_id) REFERENCES TWEETS;
+
+-- Add Primary key
+ALTER TABLE TWEET_METADATA ADD PRIMARY KEY (tweet_id);
+
+--- 5. USER_MENTIONS 
+-- CREATE TABLE USER_MENTIONS
+CREATE TABLE USER_MENTIONS AS
+SELECT jsonb_path_query(tweets, '$.id') AS tweet_id,
+        jsonb_path_query(tweets, '$.entities.user_mentions') AS user_mentions
+FROM raw_json LIMIT 60000;
+
+-- Specify Data types
+ALTER TABLE USER_MENTIONS
+ALTER COLUMN 
+  tweet_id SET DATA TYPE bigint USING tweet_id::bigint,
+  ALTER COLUMN 
+  user_mentions SET DATA TYPE jsonb USING user_mentions::jsonb; 
+
+-- Delete duplicates
+DELETE FROM USER_MENTIONS
+WHERE tweet_id IN
+    (SELECT tweet_id
+    FROM 
+        (SELECT tweet_id,
+         ROW_NUMBER() OVER( PARTITION BY tweet_id
+        ORDER BY  tweet_id ) AS row_num
+        FROM USER_MENTIONS) t
+        WHERE t.row_num > 1 );
+
+-- Drop null tweets
+DELETE FROM USER_MENTIONS WHERE tweet_id IS NULL;		
+
+-- Add FOREIGN key
+ALTER TABLE USER_MENTIONS ADD FOREIGN KEY (tweet_id) REFERENCES TWEETS;
+
+-- Add Primary key
+ALTER TABLE USER_MENTIONS ADD PRIMARY KEY (tweet_id);
+
+
+-- 6. LOCATION
+-- CREATE TABLE LOCATION
+CREATE TABLE LOCATION AS
+SELECT jsonb_path_query(tweets, '$.place.id') AS tweet_place_id,
+		jsonb_path_query(tweets, '$.place.url') AS place_url,
+		jsonb_path_query(tweets, '$.place.name') AS place_name,
+		jsonb_path_query(tweets, '$.place.country') AS country,
+		jsonb_path_query(tweets, '$.place.full_name') AS place_full_name,
+		jsonb_path_query(tweets, '$.place.country_code') AS country_code
+FROM raw_json LIMIT 60000;
+
+-- Specify Data types
+ALTER TABLE LOCATION
+  ALTER COLUMN 
+  tweet_place_id SET DATA TYPE varchar USING tweet_place_id::varchar,
+  ALTER COLUMN 
+  place_url SET DATA TYPE varchar USING place_url::varchar,
+  ALTER COLUMN 
+  place_name SET DATA TYPE varchar USING place_name::varchar,
+  ALTER COLUMN 
+  country SET DATA TYPE varchar USING country::varchar,
+  ALTER COLUMN 
+  place_full_name SET DATA TYPE varchar USING place_full_name::varchar,
+  ALTER COLUMN 
+  country_code SET DATA TYPE varchar USING country_code::varchar;
+
+-- Delete duplicates
+DELETE FROM LOCATION
+WHERE tweet_place_id IN
+    (SELECT tweet_place_id
+    FROM 
+        (SELECT tweet_place_id,
+         ROW_NUMBER() OVER( PARTITION BY tweet_place_id
+        ORDER BY tweet_place_id) AS row_num
+        FROM LOCATION) t
+        WHERE t.row_num > 1 );
+	
+-- Drop Null values from tweet_place_id
+DELETE FROM LOCATION WHERE tweet_place_id IS NULL;
+
+-- Add primary key
+ALTER TABLE LOCATION ADD PRIMARY KEY (tweet_place_id);
+
+
+-- 7. LOCATION_BOUNDING_BOX
+-- CREATE TABLE LOCATION_BOUNDING_BOX
+CREATE TABLE LOCATION_BOUNDING_BOX AS
+SELECT jsonb_path_query(tweets, '$.place.id') AS tweet_place_id,
+		jsonb_path_query(tweets, '$.place.bounding_box.type') AS place_type,
+		jsonb_path_query(tweets, '$.place.bounding_box.coordinates') AS coordinates
+FROM raw_json LIMIT 60000;
+
+-- Specify Data types
+ALTER TABLE LOCATION_BOUNDING_BOX
+  ALTER COLUMN 
+  tweet_place_id SET DATA TYPE varchar USING tweet_place_id::varchar,
+  ALTER COLUMN 
+  place_type SET DATA TYPE varchar USING place_type::varchar;
+
+-- Delete duplicates
+DELETE FROM LOCATION_BOUNDING_BOX
+WHERE tweet_place_id IN
+    (SELECT tweet_place_id
+    FROM 
+        (SELECT tweet_place_id,
+         ROW_NUMBER() OVER( PARTITION BY tweet_place_id
+        ORDER BY  tweet_place_id) AS row_num
+        FROM LOCATION_BOUNDING_BOX) t
+        WHERE t.row_num > 1 );
+	
+-- Drop Null values from tweet_place_id
+DELETE FROM LOCATION_BOUNDING_BOX WHERE tweet_place_id IS NULL;
+
+-- Add Foreign Key
+ALTER TABLE LOCATION_BOUNDING_BOX ADD FOREIGN KEY (tweet_place_id) REFERENCES LOCATION;
+
+-- Add primary key
+ALTER TABLE LOCATION_BOUNDING_BOX ADD PRIMARY KEY (tweet_place_id);
+
+
+-- 8. USER_INFO
+-- CREATE TABLE USER_INFO;
+CREATE TABLE USER_INFO AS
+SELECT jsonb_path_query(tweets, '$.user.id') AS user_id,
+		jsonb_path_query(tweets, '$.user.url') AS in_profile_url,
+		jsonb_path_query(tweets, '$.user.lang') AS user_lang,
+		jsonb_path_query(tweets, '$.user.name') AS user_name,
+		jsonb_path_query(tweets, '$.user.verified') AS verified,
+		jsonb_path_query(tweets, '$.user.protected') AS protected,
+		jsonb_path_query(tweets, '$.user.created_at') AS profile_created_at,
+		jsonb_path_query(tweets, '$.user.description') AS description,
+		jsonb_path_query(tweets, '$.user.screen_name') AS screen_name,
+		jsonb_path_query(tweets, '$.user.statuses_count') AS statuses_count,
+	   	jsonb_path_query(tweets, '$.user.default_profile') AS default_profile
+FROM raw_json LIMIT 60000;
+
+
+-- Specify Data types
+ALTER TABLE USER_INFO
+  ALTER COLUMN 
+  user_id SET DATA TYPE bigint USING user_id::bigint,
+  ALTER COLUMN 
+  in_profile_url SET DATA TYPE varchar USING in_profile_url::varchar,
+  ALTER COLUMN 
+  user_lang SET DATA TYPE varchar USING user_lang::varchar,
+  ALTER COLUMN 
+  user_name SET DATA TYPE varchar USING user_name::varchar,
+  ALTER COLUMN 
+  verified SET DATA TYPE boolean USING verified::boolean,
+  ALTER COLUMN
+  statuses_count SET DATA TYPE bigint USING statuses_count::bigint,
+  ALTER COLUMN 
+  protected SET DATA TYPE boolean USING protected::boolean,
+  ALTER COLUMN 
+  profile_created_at SET DATA TYPE varchar USING profile_created_at::varchar,
+  ALTER COLUMN 
+  description SET DATA TYPE text USING description::text,
+  ALTER COLUMN 
+  screen_name SET DATA TYPE varchar USING screen_name::varchar,
+  ALTER COLUMN 
+  default_profile SET DATA TYPE boolean USING  default_profile::boolean;
+
+ALTER TABLE USER_INFO
+  ALTER COLUMN 
+  profile_created_at SET DATA TYPE text USING profile_created_at::text;
+
+-- Delete duplicates
+DELETE FROM USER_INFO
+WHERE user_id IN
+    (SELECT user_id
+    FROM 
+        (SELECT user_id,
+         ROW_NUMBER() OVER( PARTITION BY user_id
+        ORDER BY  user_id ) AS row_num
+        FROM USER_INFO) t
+        WHERE t.row_num > 1 );
+		
+ALTER TABLE USER_INFO ADD PRIMARY KEY (user_id);
+
+
+-- 9. USER_ACTIVITY
+-- CREATE TABLE USER_ACTIVITY;
+CREATE TABLE USER_ACTIVITY AS
+SELECT jsonb_path_query(tweets, '$.user.id') AS user_id,
+		jsonb_path_query(tweets, '$.user.listed_count') AS listed_count,
+		jsonb_path_query(tweets, '$.user.friends_count') AS friends_count,
+		jsonb_path_query(tweets, '$.user.followers_count') AS followers_count,
+		jsonb_path_query(tweets, '$.user.favourites_count') AS favourites_count,
+		jsonb_path_query(tweets, '$.user.statuses_count') AS statuses_count
+FROM raw_json LIMIT 60000;
+
+
+-- Specify Data types
+ALTER TABLE USER_ACTIVITY
+  ALTER COLUMN 
+  user_id SET DATA TYPE bigint USING user_id::bigint,
+  ALTER COLUMN 
+  listed_count SET DATA TYPE bigint USING listed_count::bigint,
+  ALTER COLUMN 
+  friends_count SET DATA TYPE bigint USING friends_count::bigint,
+  ALTER COLUMN 
+  followers_count SET DATA TYPE bigint USING followers_count::bigint,
+  ALTER COLUMN 
+  favourites_count SET DATA TYPE bigint USING favourites_count::bigint,
+  ALTER COLUMN 
+  statuses_count SET DATA TYPE bigint USING statuses_count::bigint;
+
+-- Delete duplicates
+DELETE FROM USER_ACTIVITY
+WHERE user_id IN
+    (SELECT user_id
+    FROM 
+        (SELECT user_id,
+         ROW_NUMBER() OVER( PARTITION BY user_id
+        ORDER BY  user_id ) AS row_num
+        FROM USER_ACTIVITY) t
+        WHERE t.row_num > 1 );
+
+-- Add Foreign Key 
+ALTER TABLE USER_ACTIVITY ADD FOREIGN KEY(user_id) REFERENCES user_info;
+
+-- Add Primary Key
+ALTER TABLE USER_ACTIVITY ADD PRIMARY KEY (user_id);
+
+
+--- 10. MEDIA 
+-- CREATE TABLE MEDIA
+CREATE TABLE MEDIA AS
+SELECT jsonb_path_query(tweets, '$.entities.media.id') AS media_id,
+        jsonb_path_query(tweets, '$.entities.media.type') AS media_type,
+		jsonb_path_query(tweets, '$.entities.media.media_url') AS media_url,
+		jsonb_path_query(tweets, '$.entities.media.source_user_id') AS source_user_id,
+		jsonb_path_query(tweets, '$.entities.media.source_status_id') AS source_status_id,
+		jsonb_path_query(tweets, '$.entities.media.additional_media_info') AS additional_media_info
+FROM raw_json LIMIT 60000;
+
+-- Specify Data types
+ALTER TABLE MEDIA
+  ALTER COLUMN
+  media_id SET DATA TYPE bigint USING media_id::bigint,
+  ALTER COLUMN 
+  media_type SET DATA TYPE text USING media_type::text,
+  ALTER COLUMN 
+  media_url SET DATA TYPE varchar USING media_url::varchar,
+  ALTER COLUMN 
+  source_user_id SET DATA TYPE bigint USING source_user_id::bigint,
+  ALTER COLUMN 
+  source_status_id SET DATA TYPE bigint USING source_status_id::bigint,
+  ALTER COLUMN 
+  additional_media_info SET DATA TYPE jsonb USING additional_media_info::jsonb;
+
+-- Drop null tweets
+DELETE FROM MEDIA WHERE media_id IS NULL;
+
+--- Delete duplicates
+DELETE FROM media
+WHERE media_id IN
+    (SELECT media_id
+    FROM 
+        (SELECT media_id,
+         ROW_NUMBER() OVER( PARTITION BY media_id
+        ORDER BY  media_id) AS row_num
+        FROM media) t
+        WHERE t.row_num > 1 );
+
+-- Add PRIMARY Key
+ALTER TABLE MEDIA ADD PRIMARY KEY(media_id);
+
+
+--- 11. MEDIA_SIZE
+-- CREATE TABLE MEDIA_SIZE;
+CREATE TABLE MEDIA_SIZE AS
+SELECT  jsonb_path_query(tweets, '$.entities.media.id') AS media_id,
+        jsonb_path_query(tweets, '$.extended_entities.media.sizes.large') AS "large",
+    jsonb_path_query(tweets, '$.extended_entities.media.sizes.small') AS "small",
+    jsonb_path_query(tweets, '$.extended_entities.media.sizes.thumb') AS "thumb",
+    jsonb_path_query(tweets, '$.extended_entities.media.sizes.medium') AS "medium"
+FROM raw_json LIMIT 60000;
+
+-- Specify Data types
+ALTER TABLE MEDIA_SIZE
+  ALTER COLUMN 
+  media_id SET DATA TYPE bigint USING media_id::bigint,
+  ALTER COLUMN 
+  "large" SET DATA TYPE jsonb USING "large"::jsonb,
+  ALTER COLUMN 
+  "small" SET DATA TYPE jsonb USING "small"::jsonb,
+  ALTER COLUMN 
+  "thumb" SET DATA TYPE jsonb USING "thumb"::jsonb,
+  ALTER COLUMN 
+  "medium" SET DATA TYPE jsonb USING "medium"::jsonb; 
+  
+-- Drop null tweets
+DELETE FROM MEDIA_SIZE WHERE media_id IS NULL;
+
+-- Delete duplicates
+DELETE FROM MEDIA_SIZE
+WHERE media_id IN
+    (SELECT media_id
+    FROM 
+        (SELECT media_id,
+         ROW_NUMBER() OVER( PARTITION BY media_id
+        ORDER BY  media_id ) AS row_num
+        FROM MEDIA_SIZE) t
+        WHERE t.row_num > 1 );
+
+-- FOREIGN KEY    
+ALTER TABLE MEDIA_SIZE ADD FOREIGN KEY (media_id) REFERENCES MEDIA;
+
+-- Add Primary Key
+ALTER TABLE MEDIA_SIZE ADD PRIMARY KEY (media_id);
+
+-- 12. MEDIA_INFO
+-- CREATE TABLE MEDIA_INFO;
+CREATE TABLE MEDIA_INFO AS
+SELECT  jsonb_path_query(tweets, '$.entities.media.id') AS media_id,
+        jsonb_path_query(tweets, '$.extended_entities.media.additional_media_info') AS additional_media_info,
+    jsonb_path_query(tweets, '$.extended_entities.media.additional_media_info.title') AS title,
+    jsonb_path_query(tweets, '$.extended_entities.media.additional_media_info.embeddable') AS embeddable,
+    jsonb_path_query(tweets, '$.extended_entities.media.additional_media_info.description') AS description,
+    jsonb_path_query(tweets, '$.extended_entities.media.additional_media_info.monetizable') AS monetizable
+FROM raw_json LIMIT 60000;
+
+-- Specify Data types
+ALTER TABLE MEDIA_INFO
+  ALTER COLUMN 
+  media_id SET DATA TYPE bigint USING media_id::bigint,
+  ALTER COLUMN 
+  additional_media_info SET DATA TYPE jsonb USING additional_media_info::jsonb,
+  ALTER COLUMN 
+  title SET DATA TYPE jsonb USING title::jsonb,
+  ALTER COLUMN 
+  embeddable SET DATA TYPE boolean USING embeddable::boolean,
+  ALTER COLUMN 
+  description SET DATA TYPE jsonb USING description::jsonb,
+  ALTER COLUMN 
+  monetizable SET DATA TYPE boolean USING monetizable::boolean;
+
+-- Drop null tweets
+DELETE FROM MEDIA_INFO WHERE media_id IS NULL;
+
+-- Delete duplicates
+DELETE FROM MEDIA_INFO
+WHERE media_id IN
+    (SELECT media_id
+    FROM 
+        (SELECT media_id,
+         ROW_NUMBER() OVER( PARTITION BY media_id
+        ORDER BY  media_id ) AS row_num
+        FROM MEDIA_INFO) t
+        WHERE t.row_num > 1 );
+
+-- ADD Foreign Key
+ALTER TABLE MEDIA_INFO ADD FOREIGN KEY (media_id) REFERENCES MEDIA;
+
+-- Add Primary Key
+ALTER TABLE MEDIA_INFO ADD PRIMARY KEY (media_id);
+
+--- 13. HASHTAGS
+CREATE TABLE HASHTAGS AS
+SELECT jsonb_path_query(tweets, '$.entities.hashtags.text') AS hashtags,
+        jsonb_path_query(tweets, '$.tweet.id') AS tweet_id
+		FROM raw_json LIMIT 60000;
+
+-- Specify Data types
+ALTER TABLE HASHTAGS
+  ALTER COLUMN 
+  hashtags SET DATA TYPE varchar USING hashtags::varchar,
+  ALTER COLUMN 
+  tweet_id SET DATA TYPE bigint USING tweet_id::bigint;
+
+-- Drop null tweets
+DELETE FROM HASHTAGS WHERE tweet_id IS NULL;
+
+-- Delete duplicates
+DELETE FROM HASHTAGS
+WHERE tweet_id IN
+    (SELECT tweet_id
+    FROM 
+        (SELECT tweet_id,
+         ROW_NUMBER() OVER( PARTITION BY tweet_id
+        ORDER BY  tweet_id ) AS row_num
+        FROM HASHTAGS) t
+        WHERE t.row_num > 1 );
+
+-- ADD Foreign Key
+ALTER TABLE HASHTAGS ADD FOREIGN KEY (tweet_id) REFERENCES TWEET_METADATA;
+
+-- ADD primary key
+ALTER TABLE HASHTAGS ADD PRIMARY KEY (HASHTAGS);
