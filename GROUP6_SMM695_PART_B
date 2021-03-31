@@ -1,0 +1,439 @@
+-- 1. Most Popular Locations 
+
+SELECT 
+	country,
+	COUNT(country)
+FROM
+	location
+GROUP BY 
+	country
+ORDER BY 
+    count(country) DESC;
+
+-- 2. Most Popular Source
+
+SELECT tweet_source, count(tweet_text)
+FROM tweets
+GROUP BY tweet_source
+ORDER BY count DESC LIMIT 10;
+
+-- 3. Most Popular Users (followers count)
+
+SELECT user_activity.user_id,  user_name, followers_count,  verified
+FROM user_activity 
+INNER JOIN user_info ON user_activity.user_id=user_info.user_id
+ORDER BY followers_count DESC
+LIMIT 10;
+
+-- 4. Tweets of Popular Users
+
+CREATE TEMP TABLE top_users AS
+SELECT user_activity.user_id,  user_name, followers_count,  verified
+FROM user_activity 
+INNER JOIN user_info ON user_activity.user_id=user_info.user_id
+ORDER BY followers_count DESC
+LIMIT 10;
+
+SELECT top_users.user_id, user_name, tweet_text, followers_count, verified
+FROM top_users 
+LEFT JOIN tweets
+ON top_users.user_id=tweets.user_id;
+
+-- 5. Time Created At
+
+SELECT date_trunc('minute', tweet_created_at), count(tweet_text)
+FROM tweets
+GROUP BY date_trunc('minute', tweet_created_at) 
+ORDER BY count(tweet_text) DESC 
+LIMIT 10;
+
+-- 6. Most Popular Hashtags
+
+CREATE TEMP TABLE hashtags_temp AS
+SELECT tweet_id, jsonb_path_query(hashtags, '$.text') AS hashtags FROM tweet_metadata;
+SELECT * FROM hashtags_temp;
+
+SELECT hashtags, count(tweet_id)
+FROM hashtags_temp 
+GROUP BY hashtags
+ORDER BY count DESC LIMIT 20;
+
+-- 7. Hashtags + Time 
+
+CREATE TEMP TABLE top_times AS
+SELECT date_trunc('minute', tweet_created_at), count(tweet_id)
+FROM tweets
+GROUP BY date_trunc('minute', tweet_created_at) 
+ORDER BY count(tweet_text) DESC 
+LIMIT 10; 
+
+CREATE TEMP TABLE new_times AS 
+SELECT date_trunc 
+FROM top_times;
+
+CREATE TEMP TABLE tweet_times AS
+SELECT tweet_id, date_trunc('minute', tweet_created_at)
+FROM tweets;
+
+CREATE TEMP TABLE times_tweets AS
+SELECT new_times.date_trunc, tweet_id
+FROM tweet_times
+RIGHT JOIN new_times ON tweet_times.date_trunc=new_times.date_trunc;
+
+CREATE TEMP TABLE time_hashtags AS
+SELECT times_tweets.tweet_id, date_trunc, jsonb_path_query(hashtags, '$.text') AS hashtags
+FROM tweet_metadata 
+RIGHT JOIN times_tweets ON times_tweets.tweet_id=tweet_metadata.tweet_id;
+
+SELECT date_trunc, hashtags, count(hashtags)
+FROM time_hashtags 
+GROUP BY date_trunc, hashtags
+ORDER by count DESC LIMIT 50;
+
+-- 8. Player Names
+
+CREATE TEMP TABLE lebron_james AS
+SELECT count(tweet_text)
+FROM tweets
+WHERE tweet_text LIKE '%james%' OR tweet_text LIKE '%lebron%' OR tweet_text LIKE '%James%' OR tweet_text LIKE '%Lebron%';
+
+ALTER TABLE lebron_james 
+ADD COLUMN player text;
+
+UPDATE lebron_james
+SET player='Lebron James';
+
+CREATE TEMP TABLE kevin_love AS
+SELECT count(tweet_text)
+FROM tweets
+WHERE tweet_text LIKE '%love%' OR tweet_text LIKE '%Love%';
+
+ALTER TABLE kevin_love 
+ADD COLUMN player text;
+
+UPDATE kevin_love
+SET player='Kevin Love';
+
+CREATE TEMP TABLE rodney_hood AS
+SELECT count(tweet_text)
+FROM tweets
+WHERE tweet_text LIKE '%rodney%' OR tweet_text LIKE '%hood%'OR tweet_text LIKE '%Rodney%' OR tweet_text LIKE '%Hood%';
+
+ALTER TABLE rodney_hood 
+ADD COLUMN player text;
+
+UPDATE rodney_hood
+SET player='Rodney Hood';
+
+CREATE TEMP TABLE george_hill AS
+SELECT count(tweet_text)
+FROM tweets
+WHERE tweet_text LIKE '%george%' OR tweet_text LIKE '%hill%'OR tweet_text LIKE '%George%' OR tweet_text LIKE '%Hill%';
+
+ALTER TABLE george_hill 
+ADD COLUMN player text;
+
+UPDATE george_hill
+SET player='George Hill';
+
+CREATE TEMP TABLE jr_smith AS
+SELECT count(tweet_text)
+FROM tweets
+WHERE tweet_text LIKE '%JR%' OR tweet_text LIKE '%Smith%'OR tweet_text LIKE '%jr%' OR tweet_text LIKE '%smith%' OR tweet_text LIKE '%J.R';
+
+ALTER TABLE jr_smith
+ADD COLUMN player text;
+
+UPDATE jr_smith
+SET player='J.R Smith';
+
+CREATE TEMP TABLE kevin_durant AS
+SELECT count(tweet_text)
+FROM tweets
+WHERE tweet_text LIKE '%kevin%' OR tweet_text LIKE '%durant%'OR tweet_text LIKE '%Kevin%' OR tweet_text LIKE '%Durant%' OR tweet_text LIKE '%kd%' 
+OR tweet_text LIKE '%KD%';
+
+ALTER TABLE kevin_durant 
+ADD COLUMN player text;
+
+UPDATE kevin_durant
+SET player='Kevin Durant';
+
+CREATE TEMP TABLE draymond_green AS
+SELECT count(tweet_text)
+FROM tweets
+WHERE tweet_text LIKE '%draymond%' OR tweet_text LIKE '%green%'OR tweet_text LIKE '%Draymond%' OR tweet_text LIKE '%Green%';
+
+ALTER TABLE draymond_green 
+ADD COLUMN player text;
+
+UPDATE draymond_green
+SET player='Draymond Green';
+
+CREATE TEMP TABLE klay_thompson AS
+SELECT count(tweet_text)
+FROM tweets
+WHERE tweet_text LIKE '%klay%' OR tweet_text LIKE '%thompson%'OR tweet_text LIKE '%Klay%' OR tweet_text LIKE '%Thompson%';
+
+ALTER TABLE klay_thompson 
+ADD COLUMN player text;
+
+UPDATE klay_thompson
+SET player='Klay Thompson';
+
+CREATE TEMP TABLE steph_curry AS
+SELECT count(tweet_text)
+FROM tweets
+WHERE tweet_text LIKE '%steph%' OR tweet_text LIKE '%curry%'OR tweet_text LIKE '%Steph%' OR tweet_text LIKE '%Curry%';
+
+ALTER TABLE steph_curry 
+ADD COLUMN player text;
+
+UPDATE steph_curry
+SET player='Steph Curry';
+
+CREATE TEMP TABLE javale_mcgee AS
+SELECT count(tweet_text)
+FROM tweets
+WHERE tweet_text LIKE '%javale%' OR tweet_text LIKE '%mcgee%'OR tweet_text LIKE '%Javale%' OR tweet_text LIKE '%Mcgee%' OR tweet_text LIKE '%McGee';
+
+ALTER TABLE javale_mcgee 
+ADD COLUMN player text;
+
+UPDATE javale_mcgee
+SET player='Javale McGee';
+
+SELECT player, count FROM lebron_james
+UNION SELECT player, count FROM kevin_love
+UNION SELECT player, count FROM rodney_hood
+UNION SELECT player, count FROM george_hill
+UNION SELECT player, count FROM jr_smith
+UNION SELECT player, count FROM kevin_durant
+UNION SELECT player, count FROM draymond_green
+UNION SELECT player, count FROM steph_curry
+UNION SELECT player, count FROM klay_thompson
+UNION SELECT player, count FROM javale_mcgee
+ORDER BY count DESC;
+
+-- 9. Player Names Media
+
+CREATE TEMP TABLE lebron_james_media AS
+SELECT count(media_id)
+FROM tweets
+WHERE tweet_text LIKE '%james%' OR tweet_text LIKE '%lebron%'
+OR tweet_text LIKE '%James%' OR tweet_text LIKE '%Lebron%';
+
+ALTER TABLE lebron_james_media 
+ADD COLUMN player text;
+
+UPDATE lebron_james_media
+SET player='Lebron James';
+
+CREATE TEMP TABLE kevin_durant_media AS
+SELECT count(media_id)
+FROM tweets
+WHERE tweet_text LIKE '%kevin%' OR tweet_text LIKE '%durant%'
+OR tweet_text LIKE '%Kevin%' OR tweet_text LIKE '%Durant%'
+OR tweet_text LIKE '%kd%' OR tweet_text LIKE '%KD%';
+
+ALTER TABLE kevin_durant_media 
+ADD COLUMN player text;
+
+UPDATE kevin_durant_media
+SET player='Kevin Durant';
+
+CREATE TEMP TABLE kevin_love_media AS
+SELECT count(media_id)
+FROM tweets
+WHERE tweet_text LIKE '%love%' OR tweet_text LIKE '%Love%';
+
+ALTER TABLE kevin_love_media 
+ADD COLUMN player text;
+
+UPDATE kevin_love_media
+SET player='Kevin Love';
+
+CREATE TEMP TABLE jr_smith_media AS
+SELECT count(media_id)
+FROM tweets
+WHERE tweet_text LIKE '%jr%' OR tweet_text LIKE '%smith%'
+OR tweet_text LIKE '%JR%' OR tweet_text LIKE '%Smith%' or tweet_text LIKE '%J.R%';
+
+ALTER TABLE jr_smith_media 
+ADD COLUMN player text;
+
+UPDATE jr_smith_media
+SET player='JR Smith';
+
+CREATE TEMP TABLE steph_curry_media AS
+SELECT count(media_id)
+FROM tweets
+WHERE tweet_text LIKE '%steph%' OR tweet_text LIKE '%curry%'
+OR tweet_text LIKE '%Steph%' OR tweet_text LIKE '%Curry%';
+
+ALTER TABLE steph_curry_media 
+ADD COLUMN player text;
+
+UPDATE steph_curry_media
+SET player='Steph Curry';
+
+CREATE TEMP TABLE draymond_green_media AS
+SELECT count(media_id)
+FROM tweets
+WHERE tweet_text LIKE '%draymond%' OR tweet_text LIKE '%green%'
+OR tweet_text LIKE '%Draymond%' OR tweet_text LIKE '%Green%';
+
+ALTER TABLE draymond_green_media 
+ADD COLUMN player text;
+
+UPDATE draymond_green_media
+SET player='Draymond Green';
+
+SELECT player, count FROM lebron_james_media
+UNION SELECT player, count FROM kevin_durant_media
+UNION SELECT player, count FROM kevin_love_media
+UNION SELECT player, count FROM jr_smith_media
+UNION SELECT player, count FROM steph_curry_media
+UNION SELECT player, count FROM draymond_green_media;
+
+-- 10. Player Names by Emoji
+
+CREATE TEMP TABLE lebron_james_tweets AS
+SELECT tweet_text
+FROM tweets
+WHERE tweet_text LIKE '%james%' OR tweet_text LIKE '%lebron%'
+OR tweet_text LIKE '%James%' OR tweet_text LIKE '%Lebron%';
+
+CREATE TEMP TABLE lebron_james_emojis AS
+SELECT 
+(SELECT count(tweet_text) FROM lebron_james_tweets WHERE tweet_text LIKE '%🐐%') AS goat, 
+(SELECT count(tweet_text) FROM lebron_james_tweets WHERE tweet_text LIKE '%👑%') AS crown,
+(SELECT count(tweet_text) FROM lebron_james_tweets WHERE tweet_text LIKE '%🔥%') AS fire,
+(SELECT count(tweet_text) FROM lebron_james_tweets WHERE tweet_text LIKE '%😂%') AS laughing,
+(SELECT count(tweet_text) FROM lebron_james_tweets WHERE tweet_text LIKE '%👀%') AS eyes, 
+(SELECT count(tweet_text) FROM lebron_james_tweets WHERE tweet_text LIKE '%🙄%') AS rolling_eyes
+;
+
+ALTER TABLE lebron_james_emojis 
+ADD COLUMN player text;
+
+UPDATE lebron_james_emojis
+SET player='Lebron James';
+
+CREATE TEMP TABLE kevin_durant_tweets AS
+SELECT tweet_text
+FROM tweets
+WHERE tweet_text LIKE '%kevin%' OR tweet_text LIKE '%durant%'
+OR tweet_text LIKE '%Kevin%' OR tweet_text LIKE '%Durant%'
+OR tweet_text LIKE '%kd%' OR tweet_text LIKE '%KD%';
+
+CREATE TEMP TABLE kevin_durant_emojis AS
+SELECT 
+(SELECT count(tweet_text) FROM kevin_durant_tweets WHERE tweet_text LIKE '%🐐%') AS goat, 
+(SELECT count(tweet_text) FROM kevin_durant_tweets WHERE tweet_text LIKE '%👑%') AS crown,
+(SELECT count(tweet_text) FROM kevin_durant_tweets WHERE tweet_text LIKE '%🔥%') AS fire,
+(SELECT count(tweet_text) FROM kevin_durant_tweets WHERE tweet_text LIKE '%😂%') AS laughing,
+(SELECT count(tweet_text) FROM kevin_durant_tweets WHERE tweet_text LIKE '%👀%') AS eyes, 
+(SELECT count(tweet_text) FROM kevin_durant_tweets WHERE tweet_text LIKE '%🙄%') AS rolling_eyes
+;
+
+ALTER TABLE kevin_durant_emojis 
+ADD COLUMN player text;
+
+UPDATE kevin_durant_emojis
+SET player='Kevin Durant';
+
+CREATE TEMP TABLE kevin_love_tweets AS
+SELECT tweet_text
+FROM tweets
+WHERE tweet_text LIKE '%love%' OR tweet_text LIKE '%Love%';
+
+CREATE TEMP TABLE kevin_love_emojis AS
+SELECT 
+(SELECT count(tweet_text) FROM kevin_love_tweets WHERE tweet_text LIKE '%🐐%') AS goat, 
+(SELECT count(tweet_text) FROM kevin_love_tweets WHERE tweet_text LIKE '%👑%') AS crown,
+(SELECT count(tweet_text) FROM kevin_love_tweets WHERE tweet_text LIKE '%🔥%') AS fire,
+(SELECT count(tweet_text) FROM kevin_love_tweets WHERE tweet_text LIKE '%😂%') AS laughing,
+(SELECT count(tweet_text) FROM kevin_love_tweets WHERE tweet_text LIKE '%👀%') AS eyes, 
+(SELECT count(tweet_text) FROM kevin_love_tweets WHERE tweet_text LIKE '%🙄%') AS rolling_eyes
+;
+
+ALTER TABLE kevin_love_emojis 
+ADD COLUMN player text;
+
+UPDATE kevin_love_emojis
+SET player='Kevin Love';
+
+CREATE TEMP TABLE jr_smith_tweets AS
+SELECT tweet_text
+FROM tweets
+WHERE tweet_text LIKE '%JR%' OR tweet_text LIKE '%Smith%'
+OR tweet_text LIKE '%jr%' OR tweet_text LIKE '%smith%' OR tweet_text LIKE '%J.R%';
+
+CREATE TEMP TABLE jr_smith_emojis AS
+SELECT 
+(SELECT count(tweet_text) FROM jr_smith_tweets WHERE tweet_text LIKE '%🐐%') AS goat, 
+(SELECT count(tweet_text) FROM jr_smith_tweets WHERE tweet_text LIKE '%👑%') AS crown,
+(SELECT count(tweet_text) FROM jr_smith_tweets WHERE tweet_text LIKE '%🔥%') AS fire,
+(SELECT count(tweet_text) FROM jr_smith_tweets WHERE tweet_text LIKE '%😂%') AS laughing,
+(SELECT count(tweet_text) FROM jr_smith_tweets WHERE tweet_text LIKE '%👀%') AS eyes, 
+(SELECT count(tweet_text) FROM jr_smith_tweets WHERE tweet_text LIKE '%🙄%') AS rolling_eyes
+;
+
+ALTER TABLE jr_smith_emojis 
+ADD COLUMN player text;
+
+UPDATE jr_smith_emojis
+SET player='J.R Smith';
+
+CREATE TEMP TABLE steph_curry_tweets AS
+SELECT tweet_text
+FROM tweets
+WHERE tweet_text LIKE '%steph%' OR tweet_text LIKE '%curry%'
+OR tweet_text LIKE '%Steph%' OR tweet_text LIKE '%Curry%';
+
+CREATE TEMP TABLE steph_curry_emojis AS
+SELECT 
+(SELECT count(tweet_text) FROM steph_curry_tweets WHERE tweet_text LIKE '%🐐%') AS goat, 
+(SELECT count(tweet_text) FROM steph_curry_tweets WHERE tweet_text LIKE '%👑%') AS crown,
+(SELECT count(tweet_text) FROM steph_curry_tweets WHERE tweet_text LIKE '%🔥%') AS fire,
+(SELECT count(tweet_text) FROM steph_curry_tweets WHERE tweet_text LIKE '%😂%') AS laughing,
+(SELECT count(tweet_text) FROM steph_curry_tweets WHERE tweet_text LIKE '%👀%') AS eyes, 
+(SELECT count(tweet_text) FROM steph_curry_tweets WHERE tweet_text LIKE '%🙄%') AS rolling_eyes
+;
+
+ALTER TABLE steph_curry_emojis 
+ADD COLUMN player text;
+
+UPDATE steph_curry_emojis
+SET player='Steph Curry';
+
+CREATE TEMP TABLE draymond_green_tweets AS
+SELECT tweet_text
+FROM tweets
+WHERE tweet_text LIKE '%draymond%' OR tweet_text LIKE '%green%'
+OR tweet_text LIKE '%Draymond%' OR tweet_text LIKE '%Green%';
+
+CREATE TEMP TABLE draymond_green_emojis AS
+SELECT 
+(SELECT count(tweet_text) FROM draymond_green_tweets WHERE tweet_text LIKE '%🐐%') AS goat, 
+(SELECT count(tweet_text) FROM draymond_green_tweets WHERE tweet_text LIKE '%👑%') AS crown,
+(SELECT count(tweet_text) FROM draymond_green_tweets WHERE tweet_text LIKE '%🔥%') AS fire,
+(SELECT count(tweet_text) FROM draymond_green_tweets WHERE tweet_text LIKE '%😂%') AS laughing,
+(SELECT count(tweet_text) FROM draymond_green_tweets WHERE tweet_text LIKE '%👀%') AS eyes, 
+(SELECT count(tweet_text) FROM draymond_green_tweets WHERE tweet_text LIKE '%🙄%') AS rolling_eyes
+;
+
+ALTER TABLE draymond_green_emojis
+ADD COLUMN player text;
+
+UPDATE draymond_green_emojis
+SET player='Draymond Green';
+
+SELECT player, goat, crown, fire, laughing, eyes, rolling_eyes FROM lebron_james_emojis
+UNION SELECT player, goat, crown, fire, laughing, eyes, rolling_eyes FROM kevin_durant_emojis
+UNION SELECT player, goat, crown, fire, laughing, eyes, rolling_eyes FROM kevin_love_emojis
+UNION SELECT player, goat, crown, fire, laughing, eyes, rolling_eyes FROM jr_smith_emojis
+UNION SELECT player, goat, crown, fire, laughing, eyes, rolling_eyes FROM draymond_green_emojis
+UNION SELECT player, goat, crown, fire, laughing, eyes, rolling_eyes FROM steph_curry_emojis
+
